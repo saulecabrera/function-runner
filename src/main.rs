@@ -4,11 +4,11 @@ use std::{
     path::PathBuf,
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::{Parser, ValueEnum};
 use function_runner::{
     bluejay_schema_analyzer::BluejaySchemaAnalyzer,
-    engine::{run, FunctionRunParams, ProfileOpts},
+    engine::{run, DataFormat, FunctionRunParams, ProfileOpts},
 };
 
 use is_terminal::IsTerminal;
@@ -25,6 +25,20 @@ enum Codec {
     Raw,
     /// JSON input, will be converted to MessagePack, must be valid JSON
     JsonToMessagepack,
+    /// Use binary JSON as the underlying data format.
+    ///
+    /// When this codec is used, a valid JSON input will be converted to binary
+    /// JSON. The output is expected to be binary JSON.
+    Bjson,
+}
+
+impl Codec {
+    fn is_bjson(&self) -> bool {
+        match self {
+            Self::Bjson => true,
+            _ => false,
+        }
+    }
 }
 
 /// Simple Function runner which takes JSON as a convenience.
@@ -64,7 +78,6 @@ struct Opts {
 
     #[clap(short = 'c', long, value_enum, default_value = "json")]
     codec: Codec,
-
     /// Path to graphql file containing Function schema; if omitted, defaults will be used to calculate limits.
     #[clap(short = 's', long)]
     schema_path: Option<PathBuf>,
@@ -72,6 +85,14 @@ struct Opts {
     /// Path to graphql file containing Function input query; if omitted, defaults will be used to calculate limits.
     #[clap(short = 'q', long)]
     query_path: Option<PathBuf>,
+
+    /// Use Shopify Virtual Machine Programming Interface for execution.
+    /// This options involves several invariants.
+    ///
+    /// When this option is true, binary JSON is used as the encoding format.
+    /// The `--codec` option must be set to `json-to-bjson`
+    #[clap(long)]
+    simon: bool,
 }
 
 impl Opts {
@@ -160,6 +181,13 @@ fn main() -> Result<()> {
                 .map_err(|e| anyhow!("Couldn't convert JSON to MessagePack: {}", e))?;
             (Some(json), bytes)
         }
+        Codec::Bjson => {
+            // XXX: Wasteful. There must be a better way.
+            let val: jsonbb::Value = String::from_utf8(buffer)?
+                .parse()
+                .with_context(|| "Couldn't convert JSON to binary JSON")?;
+            (None, val.as_bytes().to_vec())
+        }
     };
 
     let scale_factor = if let (Some(schema_string), Some(query_string), Some(json_value)) =
@@ -184,6 +212,11 @@ fn main() -> Result<()> {
         export: opts.export.as_ref(),
         profile_opts: profile_opts.as_ref(),
         scale_factor,
+        data_format: if opts.codec.is_bjson() {
+            DataFormat::Bjson
+        } else {
+            DataFormat::Json
+        },
     })?;
 
     if opts.json {
