@@ -972,6 +972,7 @@ dependencies = [
  "colored",
  "deterministic-wasi-ctx",
  "is-terminal",
+ "jsonbb",
  "predicates",
  "rmp-serde",
  "rust-embed",
@@ -1341,6 +1342,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29c15563dc2726973df627357ce0c9ddddbea194836909d655df6a75d2cf296d"
 dependencies = [
  "wasm-bindgen",
+]
+
+[[package]]
+name = "jsonbb"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8aabe1f8690284b7143740430d467c9d4b5b0eb77558c2b2467636964519b73a"
+dependencies = [
+ "bytes",
+ "serde",
+ "serde_json",
+ "smallvec",
 ]
 
 [[package]]

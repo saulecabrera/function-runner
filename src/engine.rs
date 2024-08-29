@@ -47,6 +47,28 @@ fn import_modules<T>(
     });
 }
 
+pub enum DataFormat {
+    /// The input and output are expected to be valid JSON.
+    Json,
+    /// The input and output are expected to be valid binary JSON.
+    Bjson,
+}
+
+impl DataFormat {
+    fn is_bjson(&self) -> bool {
+        match self {
+            Self::Bjson => true,
+            _ => false,
+        }
+    }
+}
+
+impl Default for DataFormat {
+    fn default() -> Self {
+        Self::Json
+    }
+}
+
 #[derive(Default)]
 pub struct FunctionRunParams<'a> {
     pub function_path: PathBuf,
@@ -54,6 +76,7 @@ pub struct FunctionRunParams<'a> {
     pub export: &'a str,
     pub profile_opts: Option<&'a ProfileOpts>,
     pub scale_factor: f64,
+    pub data_format: DataFormat,
 }
 
 const STARTING_FUEL: u64 = u64::MAX;
@@ -116,6 +139,7 @@ pub fn run(params: FunctionRunParams) -> Result<FunctionRunResult> {
         export,
         profile_opts,
         scale_factor,
+        data_format,
     } = params;
 
     let engine = Engine::new(
@@ -205,6 +229,13 @@ pub fn run(params: FunctionRunParams) -> Result<FunctionRunResult> {
         .expect("Output stream reference still exists")
         .into_inner();
 
+    let raw_output = if data_format.is_bjson() {
+        let json = jsonbb::ValueRef::from_bytes(&raw_output);
+        json.to_string().as_bytes().to_vec()
+    } else {
+        raw_output
+    };
+
     let output: FunctionOutput = match serde_json::from_slice(&raw_output) {
         Ok(json_output) => JsonOutput(json_output),
         Err(error) => InvalidJsonOutput(InvalidOutput {
@@ -219,8 +250,11 @@ pub fn run(params: FunctionRunParams) -> Result<FunctionRunResult> {
     let name = function_path.file_name().unwrap().to_str().unwrap();
     let size = function_path.metadata()?.len() / 1024;
 
-    let parsed_input =
-        String::from_utf8(input).map_err(|e| anyhow!("Couldn't parse input: {}", e))?;
+    let parsed_input = if data_format.is_bjson() {
+        jsonbb::ValueRef::from_bytes(&input).to_string()
+    } else {
+        String::from_utf8(input).map_err(|e| anyhow!("Couldn't parse input: {}", e))?
+    };
 
     let function_run_input = serde_json::from_str(&parsed_input)?;
 
