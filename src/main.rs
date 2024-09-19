@@ -85,14 +85,6 @@ struct Opts {
     /// Path to graphql file containing Function input query; if omitted, defaults will be used to calculate limits.
     #[clap(short = 'q', long)]
     query_path: Option<PathBuf>,
-
-    /// Use Shopify Virtual Machine Programming Interface for execution.
-    /// This options involves several invariants.
-    ///
-    /// When this option is true, binary JSON is used as the encoding format.
-    /// The `--codec` option must be set to `json-to-bjson`
-    #[clap(long)]
-    simon: bool,
 }
 
 impl Opts {
