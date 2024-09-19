@@ -230,8 +230,12 @@ pub fn run(params: FunctionRunParams) -> Result<FunctionRunResult> {
         .into_inner();
 
     let raw_output = if data_format.is_bjson() {
-        let json = jsonbb::ValueRef::from_bytes(&raw_output);
-        json.to_string().as_bytes().to_vec()
+        if raw_output.len() == 0 {
+            raw_output
+        } else {
+            let json = jsonbb::ValueRef::from_bytes(&raw_output);
+            json.to_string().as_bytes().to_vec()
+        }
     } else {
         raw_output
     };
